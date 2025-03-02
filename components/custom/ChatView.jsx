@@ -14,6 +14,7 @@ import { useParams } from "next/navigation";
 import React, { useContext, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useSidebar } from "../ui/sidebar";
+import { toast } from "react-hot-toast";
 
 function ChatView() {
   const { id } = useParams();
@@ -23,67 +24,41 @@ function ChatView() {
   const [userInput, setUserInput] = useState("");
   const [loading, setLoading] = useState(false);
   const UpdateMessages = useMutation(api.workspace.UpdateMessages);
-  const { toggleSidebar } = useSidebar();
   const UpdateTokens = useMutation(api.users.UpdateToken);
-
-  const countToken = (inputText) => {
-    return inputText.trim().split(/\s+/).filter((word) => word).length;
-  };
+  const { toggleSidebar } = useSidebar();
 
   useEffect(() => {
-    if (id) {
-      GetWorkspaceData();
-    }
+    if (id) GetWorkspaceData();
   }, [id]);
+
+  useEffect(() => {
+    if (messages?.length && messages[messages.length - 1].role === "user") {
+      GetAiResponse();
+    }
+  }, [messages]);
 
   const GetWorkspaceData = async () => {
     try {
-      const result = await convex.query(api.workspace.GetWorkspace, {
-        workspaceId: id,
-      });
+      const result = await convex.query(api.workspace.GetWorkspace, { workspaceId: id });
       setMessages(result?.messages || []);
     } catch (error) {
       console.error("Error fetching workspace data:", error);
     }
   };
 
-  useEffect(() => {
-    if (messages?.length > 0) {
-      const role = messages[messages?.length - 1].role;
-      if (role == "user") {
-        GetAiResponse();
-      }
-    }
-  }, [messages]);
-
   const GetAiResponse = async () => {
     setLoading(true);
     try {
       const PROMPT = JSON.stringify(messages) + Prompt.CHAT_PROMPT;
-      const result = await axios.post("/api/ai-chat", {
-        prompt: PROMPT,
-      });
-
-      const aiResp = {
-        role: "ai",
-        content: result.data.result,
-      };
+      const { data } = await axios.post("/api/ai-chat", { prompt: PROMPT });
+      const aiResp = { role: "ai", content: data.result };
+      
       setMessages((prev) => [...prev, aiResp]);
-
-      await UpdateMessages({
-        messages: [...messages, aiResp],
-        workspaceId: id,
-      });
-
-      const token = Number(userDetail?.token) - Number(countToken(JSON.stringify(aiResp)));
-      setUserDetail(prev=>({
-        ...prev,
-        token:token
-      }))
-      await UpdateTokens({
-        userId: userDetail?._id,
-        token: token,
-      });
+      await UpdateMessages({ messages: [...messages, aiResp], workspaceId: id });
+      
+      const updatedTokens = Math.max(0, Number(userDetail?.token) - countToken(aiResp.content));
+      setUserDetail((prev) => ({ ...prev, token: updatedTokens }));
+      await UpdateTokens({ userId: userDetail?._id, token: updatedTokens });
     } catch (error) {
       console.error("Error generating AI response:", error);
     } finally {
@@ -91,41 +66,24 @@ function ChatView() {
     }
   };
 
+  const countToken = (text) => text.trim().split(/\s+/).length;
+
   const onGenerate = (input) => {
-    if (userDetail?.token < 10)
-      {
-            toast('You dont have enough tokens !');
-                return;
-      }
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: input,
-      },
-    ]);
+    if (userDetail?.token < 10) {
+      toast.error("You don't have enough tokens!");
+      return;
+    }
+    setMessages((prev) => [...prev, { role: "user", content: input }]);
     setUserInput("");
   };
 
   return (
     <div className="relative h-[85vh] flex flex-col">
       <div className="flex-1 overflow-y-scroll scrollbar-hide px-5">
-        {messages?.map((msg, index) => (
-          <div
-            key={index}
-            className="p-3 rounded-lg mb-2 gap-2 items-center"
-            style={{
-              backgroundColor: Colors.CHAT_BACKGROUND,
-            }}
-          >
-            {msg?.role == "user" && (
-              <Image
-                src={userDetail?.picture}
-                alt="userImage"
-                width={35}
-                height={35}
-                className="rounded-full"
-              />
+        {messages.map((msg, index) => (
+          <div key={index} className="p-3 rounded-lg mb-2 gap-2 items-center" style={{ backgroundColor: Colors.CHAT_BACKGROUND }}>
+            {msg.role === "user" && userDetail?.picture && (
+              <Image src={userDetail.picture} alt="User" width={35} height={35} className="rounded-full" />
             )}
             <div className="flex flex-col">
               <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -139,33 +97,21 @@ function ChatView() {
           </div>
         )}
       </div>
-      <div className="flex gap-2 items-end">
-        {userDetail && (
-          <Image
-            src={userDetail?.picture}
-            onClick={toggleSidebar}
-            alt="userImage"
-            width={35}
-            height={35}
-            className="rounded-full cursor-pointer"
-          />
+
+      <div className="flex gap-2 items-end p-3">
+        {userDetail?.picture && (
+          <Image src={userDetail.picture} onClick={toggleSidebar} alt="User" width={35} height={35} className="rounded-full cursor-pointer" />
         )}
-        <div
-          className="p-5 border rounded-xl max-w-xl w-full mt-3 leading-7"
-          style={{ backgroundColor: Colors.BACKGROUND }}
-        >
+        <div className="p-5 border rounded-xl max-w-xl w-full mt-3 leading-7" style={{ backgroundColor: Colors.BACKGROUND }}>
           <div className="flex gap-2">
             <textarea
               placeholder={Lookup.INPUT_PLACEHOLDER}
               value={userInput}
-              onChange={(event) => setUserInput(event.target.value)}
+              onChange={(e) => setUserInput(e.target.value)}
               className="outline-none bg-transparent w-full h-32 max-h-56 resize-none"
             />
             {userInput && (
-              <ArrowRight
-                onClick={() => onGenerate(userInput)}
-                className="bg-blue-500 p-2 h-10 w-10 rounded-md cursor-pointer"
-              />
+              <ArrowRight onClick={() => onGenerate(userInput)} className="bg-blue-500 p-2 h-10 w-10 rounded-md cursor-pointer" />
             )}
           </div>
           <div>
@@ -178,6 +124,7 @@ function ChatView() {
 }
 
 export default ChatView;
+
 // "use client";
 
 // import { MessagesContext } from "@/context/MessagesContext";

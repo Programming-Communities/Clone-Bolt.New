@@ -18,6 +18,9 @@ import { useParams } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { countToken } from "./countToken";
 import { UserDetailContext } from "@/context/UserDetailContext";
+import SandpackPreviewClient from "./SandpackPreviewClient";
+import { ActionContext } from "@/context/ActionContext";
+
 
 function CodeView() {
   const { id } = useParams();
@@ -29,6 +32,11 @@ function CodeView() {
   const UpdateTokens = useMutation(api.users.UpdateToken);
   const convex = useConvex();
   const [loading, setLoading] = useState(false);
+  const { action, setAction } = useContext(ActionContext);
+
+  useEffect(()=>{
+    id&&GetFiles();
+  },[id])
 
   const GetFiles = useCallback(async () => {
     setLoading(true);
@@ -141,7 +149,7 @@ function CodeView() {
             </>
           ) : (
             <>
-              <SandpackPreview style={{ height: "80vh" }} showNavigator={true} />
+              <SandpackPreviewClient  />
             </>
           )}
         </SandpackLayout>
