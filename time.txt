@@ -1,0 +1,9 @@
+id use new wordnews
+
+npx convex dev
+npm run dev
+
+Create 
+
+done
+
