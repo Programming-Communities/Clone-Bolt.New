@@ -19,10 +19,9 @@ function Provider({ children }) {
   const [messages, setMessages] = useState([]);
   const [userDetail, setUserDetail] = useState({});
   const [queryClient] = useState(() => new QueryClient());
-  const router=useRouter();
+  const router = useRouter();
   const convex = useConvex();
   const [action, setAction] = useState({ actionType: null, timeStamp: null });
-
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -64,37 +63,35 @@ function Provider({ children }) {
   };
 
   return (
+    <div>
     <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_AUTH_CLIENT_ID_KEY}>
       <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLINT_ID }}>
-        <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={queryClient}> 
           <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
             <MessagesContext.Provider value={{ messages, setMessages }}>
               <ActionContext.Provider value={{ action, setAction }}>
-                <NextThemesProvider
-                  attribute="class"
-                  defaultTheme="dark"
-                  enableSystem
-                  disableTransitionOnChange
-                >
-                  {/* Move SidebarProvider to wrap Header */}
-                  <SidebarProvider defaultOpen={false}>
-                    <Header />
-                    <AppSideBar />
+                <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+                  <SidebarProvider defaultOpen={false} className="flex flex-col ">
+                    <Header /> {/* Move Header inside SidebarProvider */}
+                    
                     {children}
+                    <div className="absolute">
+                    <AppSideBar />
+                    </div>
                   </SidebarProvider>
                 </NextThemesProvider>
               </ActionContext.Provider>
             </MessagesContext.Provider>
           </UserDetailContext.Provider>
-        </QueryClientProvider>
+        </QueryClientProvider> 
       </PayPalScriptProvider>
     </GoogleOAuthProvider>
+    </div>
   );
   
 }
 
 export default Provider;
-
 // "use client";
 
 // import React, { useState, useEffect } from "react";
